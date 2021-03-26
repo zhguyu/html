@@ -1,0 +1,172 @@
+<h1>ELEC0088 SNS Project Assignment</h1>
+<h2>Guangyu Zhang</h2>
+<h2>Introduction</h2>
+<p>Since its global breakout in early 2020, COVID-19 has dramatically and permenently changed the way people live around the world. During this entire year, social control and resource allocation led by governments is no doubt the major and most effective method to contain and mitigate the influence of this pandemic. However, conducting social control requires systematic instructions, that is, when and how should the control be carried out, and what are the most critical factors of the spread of the virus. This project tries to address both questions.</p>
+<p>This project seeks to characterise the relationship between the spread speed of the virus in the United Kingdom and certain social factors using neural network. After the model is constructed and well-trained, it can then predict the change of the spread speed of the virus in the near future - whether increase or decrease - and serves as a reference to conducting social control.</p>
+<p>Specifically, the designed model is fed with data such as the new cases, the tested positive rate, the precentage of new cases that are admitted into hospitals, and overall social mobility in a given day, and it then predicts whether the number of new cases in the following day would increase or not. As predicting a specific number - new cases for example - is both meaningless and difficult since the data are in the scale of a country (that is, all the useful regional information are removed through averaging), predicting the trend of the virus instead would be a good substitute. A simple indication of increase or decrease would be more than satisfying for judging whether the control should tighten or loosen in the near future.</p>
+<h2>Data sources</h2>
+<h3>Inputs</h3>
+<p><code>newCases</code></p>
+<p>The number of new COVID-19 cases countrywide in a specific day.</p>
+<p><code>cumPeopleVaccinatedComplete</code></p>
+<p>The cumulative number of people that have completed vaccination countrywide up to a specific day. Intuitively the spread speed of the virus would gradually decrease as more people get vaccinated.</p>
+<p><code>newAdmissions</code></p>
+<p>The number of new hospital admissions countrywide in a specific day. The ratio between <code>newAdmissions</code> and <code>newCases</code>&nbsp;can reflect the possibility that these new infected become infection sources in the following days.</p>
+<p><code>retail_and_recreation</code></p>
+<p>The percentage of social mobility decreased (in negative) or increased (in positive) compared with normal days in a specific day. This number reflects the retail and recreation portion.</p>
+<p><code>grocery_and_pharmacy</code></p>
+<p>The percentage of social mobility decreased (in negative) or increased (in positive) compared with normal days in a specific day. This number reflects the grocery and pharmacy portion.</p>
+<p><code>parks</code></p>
+<p>The percentage of social mobility decreased (in negative) or increased (in positive) compared with normal days in a specific day. This number reflects the parks portion.</p>
+<p><code>transit_stations</code></p>
+<p>The percentage of social mobility decreased (in negative) or increased (in positive) compared with normal days in a specific day. This number reflects the transit stations portion.</p>
+<p><code>workplaces</code></p>
+<p>The percentage of social mobility decreased (in negative) or increased (in positive) compared with normal days in a specific day. This number reflects the workplaces portion.</p>
+<p><code>residential</code></p>
+<p>The percentage of social mobility decreased (in negative) or increased (in positive) compared with normal days in a specific day. This number reflects the residential portion.</p>
+<p><code>positivity_rate</code></p>
+<p>The testing positivity rate of new COVID-19 tests countrywide in a specific day. Since the number of tests that can be conducted everyday is limited by equipment supplies and human resources, this number gives a general impression on the real situation apart from <code>newCases</code>.</p>
+<p><code>portion</code></p>
+<p>The portion of new cases that is admitted into hospitals. This data is calculated by dividing <code>newAdmissions</code> with <code>newCases</code>.</p>
+<h3>Output</h3>
+<p><code>newCasesOneDay</code></p>
+<p>The predicted number of new cases in the following day. It is only the trend reflected from this number that is useful.</p>
+<h3>Sources</h3>
+<p><code>newCases</code>,&nbsp;<code>cumPeopleVaccinatedComplete</code>, <code>newAdmissions</code></p>
+<p><a href="https://coronavirus.data.gov.uk/">Daily summary | Coronavirus in the UK (data.gov.uk)</a></p>
+<p><code>retail_and_recreation</code>,&nbsp;<code>grocery_and_pharmacy</code>,&nbsp;<code>parks</code>,&nbsp;<code>transit_stations</code>,&nbsp;<code>workplaces</code>,&nbsp;<code>residential</code></p>
+<p><a href="https://www.google.com/covid19/mobility/">COVID-19 Community Mobility Reports (google.com)</a><code></code></p>
+<p><code>positivity_rate</code></p>
+<p><a href="https://ourworldindata.org/coronavirus-testing">Coronavirus (COVID-19) Testing - Statistics and Research - Our World in Data</a></p>
+<h2>Code</h2>
+<pre><code>
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+import keras
+from keras.models import Sequential
+from keras.layers import Dense, Dropout
+from keras.optimizers import SGD
+import math
+
+df = pd.read_csv("edited.csv")
+
+dataset = df.to_numpy()
+X = dataset[:, 1:12]
+Y = dataset[:, 12]
+
+x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size = 0.1)
+y_train = y_train.reshape((-1, 1))
+y_test = y_test.reshape((-1, 1))
+
+x_scaler = StandardScaler()
+x_train = x_scaler.fit_transform(x_train)
+y_scaler = StandardScaler()
+y_train = y_scaler.fit_transform(y_train)
+x_test = x_scaler.transform(x_test)
+y_test = y_scaler.transform(y_test)
+
+batch_size = 30
+epochs = 30
+
+def scheduler(epoch, lr):
+    if epoch &lt; 10:
+        return lr
+    else:
+        return lr * math.exp(-0.1)
+
+model = Sequential()
+model.add(Dense(200, activation = "relu", input_shape = (11,)))
+model.add(Dropout(0.3))
+model.add(Dense(50, activation = "relu"))
+model.add(Dropout(0.3))
+model.add(Dense(100, activation = "relu"))
+model.add(Dropout(0.3))
+model.add(Dense(50, activation = "relu"))
+model.add(Dropout(0.3))
+model.add(Dense(1, activation = "linear"))
+
+model.compile(loss = "mse", optimizer = SGD())
+
+callback = keras.callbacks.LearningRateScheduler(scheduler)
+model.fit(x_train, y_train, batch_size = batch_size, epochs = epochs, callbacks = [callback], verbose = 1, validation_split = 0.1, shuffle = True)
+
+results = model.evaluate(x_test, y_test)
+print(results)
+</code></pre>
+<pre><code></code></pre>
+<p>The neural network model consists of one input layer, four hidden layers using ReLU activation function with 200, 50, 100 and 50 neurons respectively, and one output layer using linear activation function. The problem that we face in this project is basically a prediction problem, and thus linear activation function and MSE loss function would suit the best. Apart from that, the learning rate is set to decrease after certain epochs to avoid over-fitting. The training set is shuffled between epochs.</p>
+<h2>Results</h2>
+<p>We trained the model using the above data from 7/4/2020 to 11/3/2021, and tested its accuracy using the data from 12/3/2021 to 18/3/2021. The results are followed. Please notice that the model would differentiate slightly when trained for multiple times because the split of training set and validation set is random each time, and the training set is shuffled between epochs. Thus these results are only valid for a specific training.</p>
+<table>
+<tbody>
+<tr>
+<td style="width: 75.2px;"><strong>Date</strong></td>
+<td style="width: 75.2px;"><strong>Predicted</strong></td>
+<td style="width: 49.6px;"><strong>Predicted trend</strong></td>
+<td style="width: 49.6px;"><strong>Actual</strong></td>
+<td style="width: 163.2px;"><strong>Actual trend</strong></td>
+<td style="width: 163.2px;"><strong>Cumulataive accuracy</strong></td>
+</tr>
+<tr>
+<td style="width: 75.2px;">2021/3/12</td>
+<td style="width: 75.2px;">6924</td>
+<td style="width: 49.6px;">Increase</td>
+<td style="width: 49.6px;">5534</td>
+<td style="width: 163.2px;">Decrease</td>
+<td style="width: 163.2px;">0%</td>
+</tr>
+<tr>
+<td style="width: 75.2px;">2021/3/13</td>
+<td style="width: 75.2px;">7106</td>
+<td style="width: 49.6px;">Increase</td>
+<td style="width: 49.6px;">4618</td>
+<td style="width: 163.2px;">Decrease</td>
+<td style="width: 163.2px;">0%</td>
+</tr>
+<tr>
+<td style="width: 75.2px;">2021/3/14</td>
+<td style="width: 75.2px;">7002</td>
+<td style="width: 49.6px;">Increase</td>
+<td style="width: 49.6px;">5089</td>
+<td style="width: 163.2px;">Increase</td>
+<td style="width: 163.2px;">33%</td>
+</tr>
+<tr>
+<td style="width: 75.2px;">2021/3/15</td>
+<td style="width: 75.2px;">5933</td>
+<td style="width: 49.6px;">Increase</td>
+<td style="width: 49.6px;">5294</td>
+<td style="width: 163.2px;">Increase</td>
+<td style="width: 163.2px;">50%</td>
+</tr>
+<tr>
+<td style="width: 75.2px;">2021/3/16</td>
+<td style="width: 75.2px;">5880</td>
+<td style="width: 49.6px;">Increase</td>
+<td style="width: 49.6px;">5758</td>
+<td style="width: 163.2px;">Increase</td>
+<td style="width: 163.2px;">60%</td>
+</tr>
+<tr>
+<td style="width: 75.2px;">2021/3/17</td>
+<td style="width: 75.2px;">5894</td>
+<td style="width: 49.6px;">Increase</td>
+<td style="width: 49.6px;">6303</td>
+<td style="width: 163.2px;">Increase</td>
+<td style="width: 163.2px;">67%</td>
+</tr>
+<tr>
+<td style="width: 75.2px;">2021/3/18</td>
+<td style="width: 75.2px;">6072</td>
+<td style="width: 49.6px;">Decrease</td>
+<td style="width: 49.6px;">4802</td>
+<td style="width: 163.2px;">Decrease</td>
+<td style="width: 163.2px;">71%</td>
+</tr>
+</tbody>
+</table>
+<p>&nbsp;</p>
+<h2>Conclusions</h2>
+<p>As shown above, the model is satisfying but its accuracy can still be increased by fine-tuning the input data and the neural network itself. The major difficulty we faced in the project, as discussed before, is the lack of regional information from the input data. It is intuitive that those information such as weather and population density can greatly affect the spread speed of the virus. We expect this model would be more accurate if it is used to predict the virus spread in a certain area, for example, London.</p>
+<pre><code></code></pre>
